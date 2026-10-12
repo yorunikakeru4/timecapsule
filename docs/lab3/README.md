@@ -43,7 +43,7 @@
 
 ## Что построено
 
-![Схема сети лабораторной работы](images/architecture.svg)
+![Схема сети лабораторной работы](../../images/architecture.svg)
 
 *Рис. 1. Сеть `timecapsule-dev-vpc`. NixOS-серверы, временный NAT (пунктир), приватная Route 53.*
 
@@ -84,7 +84,7 @@ X = 3 → все диапазоны считаются из `10.3.0.0/16` (пе�
 
 ### Задание 2. VPC и подсети
 
-Скрипт: [`scripts/01-network.sh`](scripts/01-network.sh) — создаёт VPC only, включает `Enable DNS resolution` **и** `Enable DNS hostnames` (второе критично для приватной зоны Route 53 в задании 11), затем все 4 подсети с обязательными тегами (`Name`, `Project`, `Environment`, `Owner`, `Lab`).
+Скрипт: [`scripts/01-network.sh`](../../scripts/01-network.sh) — создаёт VPC only, включает `Enable DNS resolution` **и** `Enable DNS hostnames` (второе критично для приватной зоны Route 53 в задании 11), затем все 4 подсети с обязательными тегами (`Name`, `Project`, `Environment`, `Owner`, `Lab`).
 
 ```bash
 cd scripts && ./01-network.sh
@@ -125,7 +125,7 @@ cd scripts && ./01-network.sh
 
 ### Задание 4. Security Group
 
-Скрипт [`scripts/02-security-groups.sh`](scripts/02-security-groups.sh) создаёт группы **в правильном порядке** (источник-группа доступна только после создания):
+Скрипт [`scripts/02-security-groups.sh`](../../scripts/02-security-groups.sh) создаёт группы **в правильном порядке** (источник-группа доступна только после создания):
 
 | Группа | Входящее | Источник | Зачем |
 |---|---|---|---|
@@ -142,7 +142,7 @@ cd scripts && ./01-network.sh
 
 ### Задание 5. Экземпляры
 
-Скрипт [`scripts/04-launch-instances.sh`](scripts/04-launch-instances.sh):
+Скрипт [`scripts/04-launch-instances.sh`](../../scripts/04-launch-instances.sh):
 
 | Роль | Имя | Подсеть | Публичный IP | SG | AMI |
 |---|---|---|---|---|---|
@@ -174,7 +174,7 @@ NIXOS_AMI_NAME=nixos/26.05.10620.f5c082a40f75-x86_64-linux
 
 Сайт (аналог «страницы web-server»): после `scripts/05-deploy-nixos.sh` открывается `http://<public-IP app-server>` — страница TimeCapsule; `/health` возвращает JSON.
 
-**Подключение через bastion.** Скрипт [`scripts/update-ssh-config.sh`](scripts/update-ssh-config.sh) дописывает в `~/.ssh/config` блок (публичный IP bastion перечитывается при каждом запуске — после stop/start просто перезапустите скрипт):
+**Подключение через bastion.** Скрипт [`scripts/update-ssh-config.sh`](../../scripts/update-ssh-config.sh) дописывает в `~/.ssh/config` блок (публичный IP bastion перечитывается при каждом запуске — после stop/start просто перезапустите скрипт):
 
 ```text
 Host bastion
@@ -208,8 +208,8 @@ Host db
 
 Скрипты варианта B (для CLI/автоматизации, как требует задание 13 для Informatică; ваша специальность Informatică aplicată — вариант A, консоль; скрипты дают тот же результат и снимают риск забытого шлюза):
 
-- [`scripts/03-nat-up.sh`](scripts/03-nat-up.sh): `allocate-address` (с тегами на EIP!) → `create-nat-gateway` (Zonal, `public-a`, Public, tagged) → `wait nat-gateway-available` → `create-route` в `private-rt` → состояние в `.state/nat.env`.
-- [`scripts/10-nat-down.sh`](scripts/10-nat-down.sh): `delete-route` → `delete-nat-gateway` → `wait nat-gateway-deleted` → `release-address` **с ретраями** (AWS отпускает EIP не сразу) → удаление файла состояния.
+- [`scripts/03-nat-up.sh`](../../scripts/03-nat-up.sh): `allocate-address` (с тегами на EIP!) → `create-nat-gateway` (Zonal, `public-a`, Public, tagged) → `wait nat-gateway-available` → `create-route` в `private-rt` → состояние в `.state/nat.env`.
+- [`scripts/10-nat-down.sh`](../../scripts/10-nat-down.sh): `delete-route` → `delete-nat-gateway` → `wait nat-gateway-deleted` → `release-address` **с ретраями** (AWS отпускает EIP не сразу) → удаление файла состояния.
 
 ```bash
 ./03-nat-up.sh
@@ -238,7 +238,7 @@ ssh db 'cd ~/nixos && sudo nixos-rebuild switch --flake .#db'   # аналор d
 
 ### Задание 7. Проверки
 
-Скрипт [`scripts/09-verify.sh`](scripts/09-verify.sh) прогоняет все проверки и собирает «доказательства» текстом (в консоли дублируйте их скриншотами).
+Скрипт [`scripts/09-verify.sh`](../../scripts/09-verify.sh) прогоняет все проверки и собирает «доказательства» текстом (в консоли дублируйте их скриншотами).
 
 **1. Доступ к базе с app-server:**
 
@@ -345,7 +345,7 @@ $ aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=ti
 
 ### Задание 9. Elastic IP
 
-[`scripts/07-eip-app.sh`](scripts/07-eip-app.sh): `allocate-address` с тегом `Name=timecapsule-dev-app-eip` → `associate-address --instance-id app`. Автоматический публичный IP app заменяется на EIP.
+[`scripts/07-eip-app.sh`](../../scripts/07-eip-app.sh): `allocate-address` с тегом `Name=timecapsule-dev-app-eip` → `associate-address --instance-id app`. Автоматический публичный IP app заменяется на EIP.
 
 Обновление адреса приложения:
 
@@ -389,7 +389,7 @@ services.postgresql = {
 
 ### Задание 11. Приватная зона Route 53
 
-[`scripts/06-route53.sh`](scripts/06-route53.sh): `create-hosted-zone` (Private, VPC `timecapsule-dev-vpc`, регион eu-central-1, обязательные теги) + A-запись `db.timecapsule.internal → <приватный IP db>`, TTL 60.
+[`scripts/06-route53.sh`](../../scripts/06-route53.sh): `create-hosted-zone` (Private, VPC `timecapsule-dev-vpc`, регион eu-central-1, обязательные теги) + A-запись `db.timecapsule.internal → <приватный IP db>`, TTL 60.
 
 ```bash
 # с app-server (через bastion), через 1-2 минуты:
@@ -405,7 +405,7 @@ $ dig +short db.timecapsule.internal
 
 ### Задание 12. Перенос данных и переключение приложения
 
-[`scripts/08-migrate-data.sh`](scripts/08-migrate-data.sh):
+[`scripts/08-migrate-data.sh`](../../scripts/08-migrate-data.sh):
 
 ```bash
 # 1) дамп локальной (старой) БД на app-server
@@ -468,8 +468,8 @@ ssh db 'cd ~/nixos && sudo nixos-rebuild switch --flake .#db'   # аналор s
 
 ### Задание 14. Архитектура и решение
 
-- Схема: [images/architecture.svg](images/architecture.svg) (рис. 1 в начале отчёта) — пользователи/ваш компьютер/GitHub вне AWS; VPC, две зоны, четыре подсети; IGW; три сервера с SG; приватная зона Route 53; временный NAT пунктиром; все имена полные, по соглашению.
-- Решение о размещении БД: [docs/adr/0002-database-placement.md](docs/adr/0002-database-placement.md) — три варианта (на одном сервере / отдельный в public / отдельный в private), последствия: экономика временного NAT, зачем EIP и когда он станет не нужен (ALB).
+- Схема: [images/architecture.svg](../../images/architecture.svg) (рис. 1 в начале отчёта) — пользователи/ваш компьютер/GitHub вне AWS; VPC, две зоны, четыре подсети; IGW; три сервера с SG; приватная зона Route 53; временный NAT пунктиром; все имена полные, по соглашению.
+- Решение о размещении БД: [docs/adr/0002-database-placement.md](../adr/0002-database-placement.md) — три варианта (на одном сервере / отдельный в public / отдельный в private), последствия: экономика временного NAT, зачем EIP и когда он станет не нужен (ALB).
 
 ---
 
