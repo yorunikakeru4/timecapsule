@@ -1,0 +1,8 @@
+{
+  "name": "yorunikakeru4/timecapsule",
+  "description": "TimeCapsule — letters to the future (cloud computing lab)",
+  "type": "project",
+  "require": {
+    "php": ">=8.2"
+  }
+}
