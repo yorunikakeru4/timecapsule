@@ -16,7 +16,6 @@
 
 ## Содержание
 
-- [Подготовка: одна сессия shell](#подготовка-одна-сессия-shell)
 - [Что построено](#что-построено)
 - [Часть 1. Базовый уровень](#часть-1-базовый-уровень)
   - [Задание 1. План адресов](#задание-1-план-адресов)
@@ -36,49 +35,6 @@
   - [Задание 14. Архитектура и решение](#задание-14-архитектура-и-решение)
 - [Завершение работы](#завершение-работа)
 - [Ответы на контрольные вопросы](#ответы-на-контрольные-вопросы)
-
----
-
-## Подготовка: одна сессия shell
-
-Весь отчёт выполняется **в одной сессии терминала** — переменные с идентификаторами ресурсов живут до её конца. Начните с этого блока (значения уже подставлены под k = 11):
-
-```bash
-export AWS_REGION=eu-central-1
-export X=11                                        # X = k % 30 = 11 % 30
-export KEY=~/.ssh/croitor.a-kepair.pem              # ключ ЛР2, chmod 400
-export OWNER=croitor.a
-
-# Обязательные теги каждого ресурса: Name + Project/Environment/Owner/Lab
-tags() {
-  echo "ResourceType=$1,Tags=[{Key=Name,Value=$2},{Key=Project,Value=timecapsule},\
-{Key=Environment,Value=dev},{Key=Owner,Value=$OWNER},{Key=Lab,Value=lab3}]"
-}
-
-# Проверки перед стартом
-aws sts get-caller-identity                          # настроенный AWS CLI
-test -f "$KEY" && echo "ключ на месте"
-```
-
-Если ID из предыдущих заданий потерялись (новая сессия) — любой ресурс находится по тегу `Name`, например:
-
-```bash
-aws ec2 describe-vpcs --filters "Name=tag:Name,Values=timecapsule-dev-vpc" \
-  --query 'Vpcs[0].VpcId' --output text
-```
-
-**Свежий NixOS AMI** (публикуется еженедельно, старые чистятся через 90 дней — поэтому ID вычисляется, а не копируется):
-
-```bash
-aws ec2 describe-images --owners 427812963091 \
-  --filters "Name=name,Values=nixos/26.05*" "Name=architecture,Values=x86_64" "Name=state,Values=available" \
-  --query 'sort_by(Images,&CreationDate)[-1].{Id:ImageId,Name:Name}' --output table
-export AMI=$(aws ec2 describe-images --owners 427812963091 \
-  --filters "Name=name,Values=nixos/26.05*" "Name=architecture,Values=x86_64" "Name=state,Values=available" \
-  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
-```
-
-На момент подготовки отчёта: `ami-09d5cc1e26dea7c81` (`nixos/26.05.10620.f5c082a40f75-x86_64-linux`).
 
 ---
 
@@ -122,7 +78,17 @@ X = 11 → все диапазоны считаются из `10.11.0.0/16`.
 
 ### Задание 2. VPC и подсети
 
-**VPC.** `Resources to create: VPC only`, диапазон из таблицы, все обязательные теги (функция `tags()` из подготовки подставляет `Project/Environment/Owner/Lab` автоматически):
+**VPC.** `Resources to create: VPC only`, диапазон из таблицы, все обязательные теги. Каждый ресурс обязан получить `Name`, `Project`, `Environment`, `Owner`, `Lab` — соберём их в функцию, она подставляется в `--tag-specifications` каждой команды отчёта:
+
+```bash
+OWNER=croitor.a
+tags() {
+  echo "ResourceType=$1,Tags=[{Key=Name,Value=$2},{Key=Project,Value=timecapsule},\
+{Key=Environment,Value=dev},{Key=Owner,Value=$OWNER},{Key=Lab,Value=lab3}]"
+}
+```
+
+Сама VPC:
 
 ```bash
 VPC_ID=$(aws ec2 create-vpc --cidr-block 10.11.0.0/16 \
@@ -142,16 +108,16 @@ aws ec2 modify-vpc-attribute --vpc-id "$VPC_ID" --enable-dns-hostnames '{"Value"
 
 ```bash
 PUB_A=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block 10.11.0.0/24 \
-  --availability-zone ${AWS_REGION}a --tag-specifications "$(tags subnet timecapsule-dev-public-a)" \
+  --availability-zone eu-central-1a --tag-specifications "$(tags subnet timecapsule-dev-public-a)" \
   --query 'Subnet.SubnetId' --output text)
 PUB_B=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block 10.11.1.0/24 \
-  --availability-zone ${AWS_REGION}b --tag-specifications "$(tags subnet timecapsule-dev-public-b)" \
+  --availability-zone eu-central-1b --tag-specifications "$(tags subnet timecapsule-dev-public-b)" \
   --query 'Subnet.SubnetId' --output text)
 PRV_A=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block 10.11.10.0/24 \
-  --availability-zone ${AWS_REGION}a --tag-specifications "$(tags subnet timecapsule-dev-private-a)" \
+  --availability-zone eu-central-1a --tag-specifications "$(tags subnet timecapsule-dev-private-a)" \
   --query 'Subnet.SubnetId' --output text)
 PRV_B=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block 10.11.11.0/24 \
-  --availability-zone ${AWS_REGION}b --tag-specifications "$(tags subnet timecapsule-dev-private-b)" \
+  --availability-zone eu-central-1b --tag-specifications "$(tags subnet timecapsule-dev-private-b)" \
   --query 'Subnet.SubnetId' --output text)
 ```
 
@@ -277,7 +243,27 @@ aws ec2 authorize-security-group-ingress --group-id "$DB_SG" \
 
 ### Задание 5. Экземпляры
 
-Запускаем три инстанса: `t3.micro`, key pair `croitor.a-kepair`, все — **NixOS AMI** из подготовки. Bastion намеренно в `public-b`, остальные в зоне `a` — обе зоны в работе.
+Запускаем три инстанса: `t3.micro`, key pair `croitor.a-kepair`, все — **NixOS AMI** из официального реестра EC2 (Account ID `427812963091`; образы публикуются еженедельно, старые чистятся через 90 дней — поэтому ID вычисляется запросом, а не копируется):
+
+```bash
+aws ec2 describe-images --owners 427812963091 \
+  --filters "Name=name,Values=nixos/26.05*" "Name=architecture,Values=x86_64" "Name=state,Values=available" \
+  --query 'sort_by(Images,&CreationDate)[-1].{Id:ImageId,Name:Name}' --output table
+AMI=$(aws ec2 describe-images --owners 427812963091 \
+  --filters "Name=name,Values=nixos/26.05*" "Name=architecture,Values=x86_64" "Name=state,Values=available" \
+  --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
+```
+
+На момент подготовки отчёта: `ami-09d5cc1e26dea7c81` (`nixos/26.05.10620.f5c082a40f75-x86_64-linux`).
+
+Ключевой пар — тот же, что в ЛР2 (в AWS он зарегистрирован как `croitor.a-kepair`):
+
+```bash
+KEY=~/.ssh/croitor.a-kepair.pem
+chmod 400 "$KEY"
+```
+
+Bastion намеренно в `public-b`, остальные в зоне `a` — обе зоны в работе.
 
 **User data.** NixOS AMI понимает user-data как **выражение NixOS-модуля** (модуль `amazon-init`): инжектируем наш публичный ключ пользователю `nixos`, поднимаем ssh:
 
@@ -654,7 +640,7 @@ ssh db 'journalctl -u postgresql -n 20 --no-pager'   # если сервис н�
 
 ```bash
 ZONE_ID=$(aws route53 create-hosted-zone --name timecapsule.internal \
-  --vpc "VPCRegion=$AWS_REGION,VPCId=$VPC_ID" \
+  --vpc "VPCRegion=eu-central-1,VPCId=$VPC_ID" \
   --caller-reference "lab3-$(date +%s)" \
   --hosted-zone-config "Comment=Private zone for timecapsule,PrivateZone=true" \
   --query 'HostedZone.Id' --output text | sed 's|/hostedzone/||')
