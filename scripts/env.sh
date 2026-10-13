@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # ---- k (порядковый номер в группе) и X = k % 30 ----
-K="${K:-3}"
+K="${K:-11}"
 X=$((K % 30))
 
 export AWS_REGION="${AWS_REGION:-eu-central-1}"
