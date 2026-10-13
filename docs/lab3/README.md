@@ -293,11 +293,12 @@ aws ec2 describe-key-pairs --key-names croitor.a-kepair >/dev/null 2>&1 || {
 
 Bastion намеренно в `public-b`, остальные в зоне `a` — обе зоны в работе.
 
-**User data.** NixOS AMI понимает user-data как **выражение NixOS-модуля** (модуль `amazon-init`): инжектируем наш публичный ключ пользователю `nixos`, поднимаем ssh:
+**User data.** NixOS AMI понимает user-data как **выражение NixOS-модуля** (модуль `amazon-init`): при первом буте он копирует user-data в `/etc/nixos/configuration.nix` и запускает `nixos-rebuild`. Инжектируем наш публичный ключ пользователю `nixos`, поднимаем ssh; строка `###` — «магическая» команда amazon-init: адрес канала, без которого rebuild на чистом образе может упасть:
 
 ```bash
 PUB=$(ssh-keygen -y -f "$KEY")
 cat > userdata.nix <<EOF
+### https://nixos.org/channels/nixos-26.05
 { lib, pkgs, ... }:
 {
   users.users.nixos.openssh.authorizedKeys.keys = [ "$PUB" ];
@@ -338,6 +339,25 @@ aws ec2 describe-instances --instance-ids "$BASTION_ID" "$APP_ID" "$DB_ID" \
   --query 'Reservations[].Instances[].{Name:Tags[?Key==`Name`].Value|[0],Id:InstanceId,Priv:PrivateIpAddress,Pub:PublicIpAddress}' \
   --output table
 ```
+
+> **Первый бут.** `run-instances` возвращает инстанс почти сразу, но amazon-init только после этого применяет user-data (`nixos-rebuild`, 2–10 минут). Пока ключ не подвешен, `ssh bastion` спросит пароль — **пароля нет, это не ошибка ввода**: либо подожди и повтори, либо посмотри ход первого бута в консоли:
+>
+> ```bash
+> aws ec2 get-console-output --instance-id "$BASTION_ID" --output text | tail -60
+> # ищи: "setting configuration from EC2 user data" и ошибки nixos-rebuild
+> ```
+>
+> Если rebuild упал совсем (например, не тот канал) — ключ продавливается на 60 секунд через EC2 Instance Connect, без user-data:
+>
+> ```bash
+> aws ec2-instance-connect send-ssh-public-key \
+>   --instance-id "$BASTION_ID" --instance-os-user nixos \
+>   --ssh-public-key "file:///tmp/croitor.a-kepair.pub"   # pub-файл из шага import-key-pair
+> PUB=$(ssh-keygen -y -f "$KEY")
+> ssh bastion "mkdir -p ~/.ssh && echo '$PUB' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+> ```
+>
+> После этого `ssh bastion` работает по ключу стабильно, а штатный путь ключ закрепит сам на шаге «Конфигурация серверов» (`nixos-rebuild` из `nixos/`, где ключ прописан в `common.nix`).
 
 **SSH-конфиг** (файл `~/.ssh/config`, блок дописывается один раз; после каждой остановки bastion перезапустите обновление `HostName`):
 
