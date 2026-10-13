@@ -1,14 +1,14 @@
 # Лабораторная работа №3. Облачные сети. Amazon VPC (NixOS edition)
 
-| | |
-|---|---|
-| **Студент** | Croitor Alexandr (Кройтор Александр) |
-| **Группа** | IA2403 |
-| **Специальность** | Informatică aplicată |
-| **k / X** | k = 11, X = k % 30 = **11** → диапазон VPC `10.11.0.0/16` |
-| **Уровень** | **Продвинутый** (Часть 1: зад. 1–7 + Часть 2: зад. 8–14) |
-| **Репозиторий** | <https://github.com/yorunikakeru4/timecapsule> |
-| **Регион** | `eu-central-1` (Frankfurt) |
+|                   |                                                           |
+| ----------------- | --------------------------------------------------------- |
+| **Студент**       | Croitor Alexandr (Кройтор Александр)                      |
+| **Группа**        | IA2403                                                    |
+| **Специальность** | Informatică aplicată                                      |
+| **k / X**         | k = 11, X = k % 30 = **11** → диапазон VPC `10.11.0.0/16` |
+| **Уровень**       | **Продвинутый** (Часть 1: зад. 1–7 + Часть 2: зад. 8–14)  |
+| **Репозиторий**   | <https://github.com/yorunikakeru4/timecapsule>            |
+| **Регион**        | `eu-central-1` (Frankfurt)                                |
 
 > **Ключевое отличие от «базового» выполнения.** Все серверы — **NixOS** стабильного канала `26.05`, образ берётся из **официального реестра EC2** (Account ID `427812963091`, публичные AMI проекта NixOS; <https://nixos.github.io/amis/>), а не Amazon Linux 2023. Конфигурация bastion/app/db описана декларативно во flake (`nixos/flake.nix`), инфраструктура AWS — командами AWS CLI, приведёнными ниже **покадрово в самом отчёте**: каждое задание читается сверху вниз как журнал выполнения — команда, ожидаемый вывод, дальше. Вместо «сделать AMI с веб-сервера ЛР2» (задание 8) состояние сервера воспроизводится из git через `nixos-rebuild`, поэтому снимки дисков создавать и удалять не нужно.
 >
@@ -42,18 +42,18 @@
 
 ![Схема сети лабораторной работы](../../images/architecture.svg)
 
-*Рис. 1. Сеть `timecapsule-dev-vpc`. NixOS-серверы, временный NAT (пунктир), приватная Route 53.*
+_Рис. 1. Сеть `timecapsule-dev-vpc`. NixOS-серверы, временный NAT (пунктир), приватная Route 53._
 
-| Слой | Ресурс | Как создан (секция отчёта) | Код |
-|---|---|---|---|
-| Сеть | VPC, 4 подсети, IGW, 2 rt | зад. 2–3 | команды ниже |
-| Фильтрация | bastion-sg / web-sg / db-sg | зад. 4 | команды ниже |
-| Интернет для private-* | NAT GW + EIP (временный) | зад. 6, 13 | команды ниже |
-| Серверы | bastion, app, db на NixOS 26.05 | зад. 5 | `nixos/` |
-| Конфигурация ОС | nginx+PHP8.4+PDO(pgsql) / PostgreSQL 16 / openssh | зад. 5–6, 10 | `nixos/flake.nix` |
-| Приложение | TimeCapsule (PHP) | зад. 8, 13 | `app/`, деплой `deploy.sh` |
-| DNS | приватная `timecapsule.internal` | зад. 11 | команды ниже |
-| Постоянный адрес | Elastic IP app | зад. 9 | команды ниже |
+| Слой                    | Ресурс                                            | Как создан (секция отчёта) |
+| ----------------------- | ------------------------------------------------- | -------------------------- |
+| Сеть                    | VPC, 4 подсети, IGW, 2 rt                         | зад. 2–3                   |
+| Фильтрация              | bastion-sg / web-sg / db-sg                       | зад. 4                     |
+| Интернет для private-\* | NAT GW + EIP (временный)                          | зад. 6, 13                 |
+| Серверы                 | bastion, app, db на NixOS 26.05                   | зад. 5                     |
+| Конфигурация ОС         | nginx+PHP8.4+PDO(pgsql) / PostgreSQL 16 / openssh | зад. 5–6, 10               |
+| Приложение              | TimeCapsule (PHP)                                 | зад. 8, 13                 |
+| DNS                     | приватная `timecapsule.internal`                  | зад. 11                    |
+| Постоянный адрес        | Elastic IP app                                    | зад. 9                     |
 
 В репозитории: `app/` → содержимое клонируется в `/var/www/timecapsule`; `nixos/` — конфигурации серверов; `docs/` — этот отчёт и ADR.
 
@@ -65,12 +65,12 @@
 
 X = 11 → все диапазоны считаются из `10.11.0.0/16`.
 
-| Подсеть | Зона доступности | Диапазон | Первый и последний адрес, доступный экземплярам | Сколько адресов доступно |
-|---|---|---|---|---|
-| `public-a` | `eu-central-1a` | `10.11.0.0/24` | `10.11.0.4` — `10.11.0.254` | 251 |
-| `public-b` | `eu-central-1b` | `10.11.1.0/24` | `10.11.1.4` — `10.11.1.254` | 251 |
-| `private-a` | `eu-central-1a` | `10.11.10.0/24` | `10.11.10.4` — `10.11.10.254` | 251 |
-| `private-b` | `eu-central-1b` | `10.11.11.0/24` | `10.11.11.4` — `10.11.11.254` | 251 |
+| Подсеть     | Зона доступности | Диапазон        | Первый и последний адрес, доступный экземплярам |
+| ----------- | ---------------- | --------------- | ----------------------------------------------- |
+| `public-a`  | `eu-central-1a`  | `10.11.0.0/24`  | `10.11.0.4` — `10.11.0.254`                     |
+| `public-b`  | `eu-central-1b`  | `10.11.1.0/24`  | `10.11.1.4` — `10.11.1.254`                     |
+| `private-a` | `eu-central-1a`  | `10.11.10.0/24` | `10.11.10.4` — `10.11.10.254`                   |
+| `private-b` | `eu-central-1b`  | `10.11.11.0/24` | `10.11.11.4` — `10.11.11.254`                   |
 
 **Почему не 256?** AWS резервирует в каждой подсети **4 адреса**: `.0` (адрес сети), `.1` (шлюз сети), `.2` (резерв под службы AWS, DHCP) и `.255` (broadcast). Экземплярам достаются оставшиеся **251**.
 
@@ -166,8 +166,6 @@ aws ec2 associate-route-table --route-table-id "$PRV_RT" --subnet-id "$PRV_A"
 aws ec2 associate-route-table --route-table-id "$PRV_RT" --subnet-id "$PRV_B"
 ```
 
-Проверка — ровно тот скриншот, что требуется в отчёте:
-
 ```bash
 aws ec2 describe-route-tables --route-table-ids "$PUB_RT" "$PRV_RT" \
   --query 'RouteTables[].{Name:Tags[?Key==`Name`].Value|[0],Routes:Routes[].{Cidr:DestinationCidrBlock,Target:GatewayId||NatGatewayId}}' \
@@ -175,9 +173,33 @@ aws ec2 describe-route-tables --route-table-ids "$PUB_RT" "$PRV_RT" \
 ```
 
 ```text
-|                   Name                   |                  Routes                  |
-| timecapsule-dev-public-rt                | 10.11.0.0/16 → local ; 0.0.0.0/0 → igw-… |
-| timecapsule-dev-private-rt               | 10.11.0.0/16 → local                     |
+
+---------------------------------------------
+|            DescribeRouteTables            |
++-------------------------------------------+
+|                   Name                    |
++-------------------------------------------+
+|  timecapsule-dev-private-rt               |
++-------------------------------------------+
+||                 Routes                  ||
+|+------------------------+----------------+|
+||          Cidr          |    Target      ||
+|+------------------------+----------------+|
+||  10.11.0.0/16          |  local         ||
+|+------------------------+----------------+|
+|            DescribeRouteTables            |
++-------------------------------------------+
+|                   Name                    |
++-------------------------------------------+
+|  timecapsule-dev-public-rt                |
++-------------------------------------------+
+||                 Routes                  ||
+|+---------------+-------------------------+|
+||     Cidr      |         Target          ||
+|+---------------+-------------------------+|
+||  10.11.0.0/16 |  local                  ||
+||  0.0.0.0/0    |  igw-096c85ed74a124467  ||
+|+---------------+-------------------------+|
 ```
 
 > **Какой маршрут есть в обеих таблицах, хотя вы его не добавляли? Что он даёт?**
@@ -236,8 +258,6 @@ aws ec2 authorize-security-group-ingress --group-id "$DB_SG" \
   --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,UserIdGroupPairs=[{GroupId=$BASTION_SG,Description=SSH via bastion}]"
 ```
 
-Исходящие правила оставлены по умолчанию (все разрешены). Для отчёта — скриншот вкладки `Inbound rules` трёх групп в `EC2 → Security Groups`.
-
 > **Почему в `db-sg` источником указана группа `web-sg`, а не адрес веб-сервера или `10.11.0.0/16`?**
 > SG ссылается на **другую группу**, а не на IP: правило само «следует» за инстансами в `web-sg` — при замене app-server ничего править не нужно. Диапазон `10.11.0.0/16` слишком широк (там же bastion и будущие серверы), конкретный IP хрупок при stop/start без EIP. Группа привязывается к **роли**, а не к сетевому местоположению.
 
@@ -253,8 +273,6 @@ AMI=$(aws ec2 describe-images --owners 427812963091 \
   --filters "Name=name,Values=nixos/26.05*" "Name=architecture,Values=x86_64" "Name=state,Values=available" \
   --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
 ```
-
-На момент подготовки отчёта: `ami-09d5cc1e26dea7c81` (`nixos/26.05.10620.f5c082a40f75-x86_64-linux`).
 
 Ключевой пар — тот же, что в ЛР2 (в AWS он зарегистрирован как `croitor.a-kepair`):
 
@@ -285,19 +303,19 @@ EOF
 BASTION_ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type t3.micro \
   --key-name croitor.a-kepair --subnet-id "$PUB_B" --associate-public-ip-address \
   --security-group-ids "$BASTION_SG" --user-data file://userdata.nix \
-  --tag-specifications "$(tags instance timecapsule-dev-bastion),$(tags volume timecapsule-dev-bastion-root)" \
+  --tag-specifications "$(tags instance timecapsule-dev-bastion)" "$(tags volume timecapsule-dev-bastion-root)" \
   --query 'Instances[0].InstanceId' --output text)
 
 APP_ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type t3.micro \
   --key-name croitor.a-kepair --subnet-id "$PUB_A" --associate-public-ip-address \
   --security-group-ids "$WEB_SG" --user-data file://userdata.nix \
-  --tag-specifications "$(tags instance timecapsule-dev-app),$(tags volume timecapsule-dev-app-root)" \
+  --tag-specifications "$(tags instance timecapsule-dev-app)" "$(tags volume timecapsule-dev-app-root)" \
   --query 'Instances[0].InstanceId' --output text)
 
 DB_ID=$(aws ec2 run-instances --image-id "$AMI" --instance-type t3.micro \
   --key-name croitor.a-kepair --subnet-id "$PRV_A" \
   --security-group-ids "$DB_SG" --user-data file://userdata.nix \
-  --tag-specifications "$(tags instance timecapsule-dev-db),$(tags volume timecapsule-dev-db-root)" \
+  --tag-specifications "$(tags instance timecapsule-dev-db)" "$(tags volume timecapsule-dev-db-root)" \
   --query 'Instances[0].InstanceId' --output text)
 
 aws ec2 wait instance-running --instance-ids "$BASTION_ID" "$APP_ID" "$DB_ID"
@@ -466,7 +484,7 @@ aws ec2 describe-route-tables --route-table-ids "$PRV_RT" \
 > **Какой адрес вернул `curl checkip`? Почему это не адрес `db-server`?**
 > Elastic IP NAT Gateway: все исходящие соединения инстансов private-подсетей SNAT маскирует адресом шлюза. Собственного публичного адреса у db нет, а интернет отвечает только на инициированные сервером соединения.
 >
-> **Три механизма, ограничивающих доступ к базе.** (1) *Маршрут и адрес*: без `0.0.0.0/0 → nat` в `private-rt` (и вообще без публичного IP) пакет из интернета физически не доедет. (2) *db-sg*: даже внутри VPC 5432 принимается только от `web-sg` — bastion получит closed. (3) *pg_hba.conf*: пройдя сеть, клиент обязан подставить пользователя/базу из разрешённой строки со scram-sha-256. Промах только в одном: без (1) — дыра ко всему миру, спасёт только SG ошибкой конфига; без (2) — 5432 слышна со всех машин VPC; без (3) — любая локальная учётка берёт любую базу по сети.
+> **Три механизма, ограничивающих доступ к базе.** (1) _Маршрут и адрес_: без `0.0.0.0/0 → nat` в `private-rt` (и вообще без публичного IP) пакет из интернета физически не доедет. (2) _db-sg_: даже внутри VPC 5432 принимается только от `web-sg` — bastion получит closed. (3) _pg_hba.conf_: пройдя сеть, клиент обязан подставить пользователя/базу из разрешённой строки со scram-sha-256. Промах только в одном: без (1) — дыра ко всему миру, спасёт только SG ошибкой конфига; без (2) — 5432 слышна со всех машин VPC; без (3) — любая локальная учётка берёт любую базу по сети.
 >
 > **Почему PostgreSQL продолжает работать после удаления NAT? Что для обновлений?** Все клиентские соединения идут внутри VPC по маршруту `local` и шлюз не задевают; NAT участвует только в исходящем трафике наружу. Для обновлений безопасности на db поднимите NAT заново (команды выше), выполните обновление, удалите шлюз — ровно этот цикл и автоматизирован в задании 13.
 
@@ -546,13 +564,13 @@ arn:aws:ec2:eu-central-1:…:instance/i-… (×3) + volume/…
 
 Сравнение ЛР2 → ЛР3:
 
-| Что | ЛР2 | ЛР3 |
-|---|---|---|
-| Сеть | default VPC, всё публичное | своя VPC, база в приватной подсети |
-| Сервер приложения | `webserver`, IP меняется | `app-server` + Elastic IP, NixOS |
-| База | localhost на webserver | отдельный `db-server`, имя `db.timecapsule.internal` |
-| SSH | напрямую с вашего IP | только через bastion (ProxyJump) |
-| Деплой | `ssh … ./deploy.sh` | тот же `ssh app ./deploy.sh`, но через bastion |
+| Что               | ЛР2                        | ЛР3                                                  |
+| ----------------- | -------------------------- | ---------------------------------------------------- |
+| Сеть              | default VPC, всё публичное | своя VPC, база в приватной подсети                   |
+| Сервер приложения | `webserver`, IP меняется   | `app-server` + Elastic IP, NixOS                     |
+| База              | localhost на webserver     | отдельный `db-server`, имя `db.timecapsule.internal` |
+| SSH               | напрямую с вашего IP       | только через bastion (ProxyJump)                     |
+| Деплой            | `ssh … ./deploy.sh`        | тот же `ssh app ./deploy.sh`, но через bastion       |
 
 > Если ЛР2 выполнена только на базовом уровне — сначала задания 7–12 ЛР2: нужен работающий TimeCapsule с пользователем и хотя бы одной капсулой.
 
@@ -574,12 +592,12 @@ fi
 
 Что содержал «образ» ЛР2, теперь содержат эти слои:
 
-| Данные ЛР2 | Где сейчас |
-|---|---|
-| код приложения | git → `/var/www/timecapsule` (clone/pull) |
-| nginx/PHP-конфиг | `nixos/modules/timecapsule-app.nix` (сборка в store-путь NixOS) |
-| пакеты ОС | `nixpkgs` (php84, nginx, postgresql_16) |
-| **данные БД** | **не в конфиге и не в git** — на `db-server` (зад. 10–12); до переноса жили на локальном postgres app-server из ЛР2 |
+| Данные ЛР2       | Где сейчас                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
+| код приложения   | git → `/var/www/timecapsule` (clone/pull)                                                                           |
+| nginx/PHP-конфиг | `nixos/modules/timecapsule-app.nix` (сборка в store-путь NixOS)                                                     |
+| пакеты ОС        | `nixpkgs` (php84, nginx, postgresql_16)                                                                             |
+| **данные БД**    | **не в конфиге и не в git** — на `db-server` (зад. 10–12); до переноса жили на локальном postgres app-server из ЛР2 |
 
 `webserver` ЛР2 завершается (`Terminate instance`): его роль выполняет `app-server`. Файлы капсул ехали с диском app (не с базой): `/var/www/timecapsule/storage/uploads`.
 
@@ -621,7 +639,7 @@ ssh db "sudo -u postgres psql -c \"CREATE USER timecapsule WITH PASSWORD 'нов
 ssh db "sudo -u postgres psql -c 'CREATE DATABASE timecapsule OWNER timecapsule;'"
 ```
 
-**Ужесточение `pg_hba.conf`.** В задании 6 строка пускала *всех* пользователей во *все* базы из `10.11.0.0/24`. Оставляем только нашу пару (в NixOS это правка `nixos/modules/postgres-lab.nix` — строка `host all timecapsule 10.11.0.0/24 scram-sha-256` — и повторный накат), либо редактируем файл напрямую:
+**Ужесточение `pg_hba.conf`.** В задании 6 строка пускала _всех_ пользователей во _все_ базы из `10.11.0.0/24`. Оставляем только нашу пару (в NixOS это правка `nixos/modules/postgres-lab.nix` — строка `host all timecapsule 10.11.0.0/24 scram-sha-256` — и повторный накат), либо редактируем файл напрямую:
 
 ```bash
 ssh db 'sudo nano /var/lib/postgresql/data/pg_hba.conf'
@@ -816,4 +834,4 @@ Bastion нужен только для SSH: если не хотите плат�
 
 ---
 
-*Отчёт — журнал выполнения: каждое задание содержит команды и выводы, которые выполнялись подряд в одной сессии; стиль изложения — по образцу отчётов SoftDesign (`~/Documents/Education/3/SoftDesign/*/README.md`): короткие тезисы, код как доказательство, трейдофы явно.*
+_Отчёт — журнал выполнения: каждое задание содержит команды и выводы, которые выполнялись подряд в одной сессии; стиль изложения — по образцу отчётов SoftDesign (`~/Documents/Education/3/SoftDesign/_/README.md`): короткие тезисы, код как доказательство, трейдофы явно.\*
