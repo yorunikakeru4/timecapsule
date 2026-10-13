@@ -274,11 +274,21 @@ AMI=$(aws ec2 describe-images --owners 427812963091 \
   --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
 ```
 
-Ключевой пар — тот же, что в ЛР2 (в AWS он зарегистрирован как `croitor.a-kepair`):
+Ключевой пар — тот же, что в ЛР2 (`.pem` хранится локально):
 
 ```bash
 KEY=~/.ssh/croitor.a-kepair.pem
 chmod 400 "$KEY"
+```
+
+В AWS должна быть зарегистрирована его **публичная** часть: `--key-name` в `run-instances` ищет имя **в AWS**, а не путь к файлу. Если ключа в аккаунте ещё нет:
+
+```bash
+aws ec2 describe-key-pairs --key-names croitor.a-kepair >/dev/null 2>&1 || {
+  ssh-keygen -y -f "$KEY" > /tmp/croitor.a-kepair.pub
+  aws ec2 import-key-pair --key-name croitor.a-kepair \
+    --public-key-material fileb:///tmp/croitor.a-kepair.pub
+}
 ```
 
 Bastion намеренно в `public-b`, остальные в зоне `a` — обе зоны в работе.
