@@ -2,10 +2,9 @@
 
 PHP-приложение лабораторных по cloud computing (ЛР2-ЛР3): регистрация, капсулы с датой открытия и вложениями, `/health` для мониторинга.
 
-- **ЛР3 (продвинутый, NixOS + Amazon VPC):** [docs/lab3/README.md](docs/lab3/README.md)
+- **ЛР3 (продвинутый, NixOS + Amazon VPC):** [docs/lab3/README.md](docs/lab3/README.md) — отчёт-журнал: все команды AWS CLI/Nix инлайном, по шагам
 - **ADR-0002 (размещение БД):** [docs/adr/0002-database-placement.md](docs/adr/0002-database-placement.md)
 - **NixOS-конфигурации серверов:** [nixos/](nixos/)
-- **Скрипты AWS (сеть, SG, NAT, Route 53, деплой):** [scripts/](scripts/)
 
 ## Deploy (вариант B)
 

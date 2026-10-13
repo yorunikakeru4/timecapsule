@@ -47,10 +47,12 @@ PostgreSQL слушает `localhost` на том же экземпляре, ч�
 ## Последствия
 
 - **Обновления без постоянного выхода в интернет.** `db-server` не может сам ходить в
-  `cache.nixos.org`/DNF. Пакеты накатываются сценарием ЛР3: поднять временный
-  NAT Gateway в `public-a` (`scripts/03-nat-up.sh`), выполнить
-  `nixos-rebuild switch --flake .#db` (или `dnf update` на нативном стеке), удалить
-  шлюз и маршрут (`scripts/10-nat-down.sh`), освободить Elastic IP. Стоимость сессии —
+  `cache.nixos.org`/DNF. Пакеты накатываются циклом из отчёта (задания 6 и 13):
+  поднять временный NAT Gateway в `public-a` (EIP → `create-nat-gateway` → `wait` →
+  маршрут `0.0.0.0/0` в `private-rt`), выполнить `nixos-rebuild switch --flake .#db`
+  (или `dnf update` на нативном стеке), удалить маршрут и шлюз (`delete-route` →
+  `delete-nat-gateway` → `wait nat-gateway-deleted`), освободить Elastic IP с ретраями.
+  Стоимость сессии —
   центы; главный риск — забытый шлюз ($1.25/сутки), поэтому удаление входит в
   обязательный чек-лист завершения работы и в скрипт `11-teardown.sh`.
 - **Elastic IP у app-server.** Публичный адрес экземпляра меняется после stop/start,

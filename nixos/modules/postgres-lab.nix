@@ -2,7 +2,7 @@
 # Слушает все интерфейсы; pg_hba пускает только подсеть public-a (10.X.0.0/24) по scram-sha-256.
 { config, lib, pkgs, ... }:
 let
-  # X = k % 30; подставить свой X (см. scripts/env.sh)
+  # X = k % 30 (k=11 → X=11); подставить свой X
   x = 11;
   publicASubnet = "10.${toString x}.0.0/24";
 in
